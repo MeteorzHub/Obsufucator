@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Luau Obfuscator</title>
+  <title>Roblox Luau Obfuscator (Safe)</title>
   <style>
     body { font-family: Arial, sans-serif; background: #1e1e1e; color: #fff; padding: 20px; }
     textarea { width: 100%; height: 200px; margin: 10px 0; background: #2b2b2b; color: #fff; border: none; padding: 10px; }
@@ -11,7 +11,7 @@
   </style>
 </head>
 <body>
-  <h1>Luau Obfuscator (Basic)</h1>
+  <h1>Roblox-Safe Luau Obfuscator</h1>
   <textarea id="inputCode" placeholder="Paste your Luau code here..."></textarea>
   <br>
   <button onclick="obfuscate()">Obfuscate</button>
@@ -19,36 +19,47 @@
   <textarea id="outputCode" placeholder="Obfuscated code will appear here..."></textarea>
 
   <script>
+    const robloxGlobals = [
+      "game","workspace","Instance","UDim2","Color3","Enum","Vector3","CFrame",
+      "BrickColor","Ray","Region3","TweenInfo","UserInputService","RunService",
+      "Players","Lighting","ReplicatedStorage","StarterGui","StarterPack"
+    ];
+
+    const stringWhitelist = [
+      "PlayerGui","Text","BackgroundColor3","Position","Size","Name"
+    ];
+
     function obfuscate() {
       let code = document.getElementById('inputCode').value;
 
       // Remove comments
-      code = code.replace(/--\[\[[\s\S]*?\]\]/g, ''); // block comments
-      code = code.replace(/--.*/g, ''); // single-line comments
+      code = code.replace(/--\[\[[\s\S]*?\]\]/g, '');
+      code = code.replace(/--.*/g, '');
 
       // Remove extra whitespace
       code = code.replace(/\s+/g, ' ');
 
-      // Rename variables (very basic: replace 'local x' with 'local _v1')
+      // Rename locals (skip Roblox globals)
       let counter = 0;
       let varMap = {};
       code = code.replace(/local\s+([a-zA-Z_][a-zA-Z0-9_]*)/g, function(_, name) {
-        if (!varMap[name]) {
+        if (!robloxGlobals.includes(name) && !varMap[name]) {
           counter++;
           varMap[name] = '_v' + counter;
         }
-        return 'local ' + varMap[name];
+        return 'local ' + (varMap[name] || name);
       });
 
-      // Encode strings
+      // Encode strings except whitelisted ones
       function encodeString(str) {
         return str.split('').map(c => c.charCodeAt(0)).join(' ');
       }
       code = code.replace(/(["'])(.*?)\1/g, function(_, quote, content) {
+        if (stringWhitelist.includes(content)) return quote + content + quote;
         return `_S("${encodeString(content)}")`;
       });
 
-      // Add decoder function
+      // Add decoder
       let decoder = `local _S=function(s)local t={}for n in s:gmatch("%d+")do t[#t+1]=tonumber(n)end return string.char(table.unpack(t))end; `;
       code = decoder + code;
 
